@@ -25,7 +25,7 @@ def _get_quantizer_config(model_id, revision):
     groupsize = -1
     quant_method = "gptq"
     checkpoint_format = None
-    sym = True
+    sym = False
     desc_act = False
 
     filename = "config.json"
@@ -38,6 +38,8 @@ def _get_quantizer_config(model_id, revision):
             data = json.load(f)
         bits = data["quantization_config"]["bits"]
         groupsize = data["quantization_config"]["group_size"]
+        # AWQ sym
+        sym = not data["quantization_config"].get("zero_point", True)
         # Order is important here, desc_act is missing on some real models
         quant_method = data["quantization_config"]["quant_method"]
         checkpoint_format = data["quantization_config"].get("checkpoint_format")

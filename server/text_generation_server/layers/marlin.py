@@ -148,7 +148,7 @@ def can_use_gptq_marlin(
         and marlin_kernels is not None
         and has_sm_8_0
         and quantize == "gptq"
-        and quant_method == "gptq"
+        and quant_method in {"awq", "gptq"}
         and bits in GPTQ_MARLIN_BITS
         and groupsize in GPTQ_MARLIN_GROUP_SIZES
         and sym
@@ -224,10 +224,11 @@ def repack_gptq_for_marlin(
     *,
     qweight: torch.Tensor,
     scales: torch.Tensor,
-    g_idx: torch.Tensor,
+    g_idx: Optional[torch.Tensor],
     bits: int,
     desc_act: bool,
     groupsize: int,
+    quant_method: str,
     sym: bool,
     sharded_infeatures: bool,
 ) -> GPTQMarlinWeight:
@@ -251,6 +252,15 @@ def repack_gptq_for_marlin(
             "Repacking GPTQ weights with asymmetric quantization as Marlin is not supported."
         )
 
+    log_once(logger.info, f"Converting {quant_method} model to Marlin packing format.")
+
+    if quant_method == "awq":
+        from text_generation_server.layers.awq.conversion_utils import (
+            fast_awq_to_gptq_sym,
+        )
+
+        qweight = fast_awq_to_gptq_sym(qweight)
+
     weights_per_int = 32 // bits
     in_features = qweight.shape[0] * weights_per_int
     out_features = qweight.shape[1]
@@ -260,7 +270,7 @@ def repack_gptq_for_marlin(
             f"Number of input features ({in_features}) not divisible by group size ({groupsize})"
         )
 
-    if desc_act and groupsize != -1:
+    if g_idx is not None and desc_act and groupsize != -1:
         perm = torch.argsort(g_idx).to(torch.int)
         g_idx = g_idx[perm]
     else:

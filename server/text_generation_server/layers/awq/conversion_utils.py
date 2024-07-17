@@ -95,3 +95,15 @@ def fast_awq_to_gptq(qweight, qzeros):
     qweight = pack(iweights, direction="row")
 
     return qweight, qzeros
+
+
+def fast_awq_to_gptq_sym(qweight):
+    # awq uses column packing for weights
+    iweights = unpack(qweight, direction="column")
+
+    # Reverse the order of the iweight tensor
+    iweights = apply_order(iweights, direction="column", order=REVERSE_AWQ_PACK_ORDER)
+    # exllama uses row packing for weights
+    qweight = pack(iweights, direction="row")
+
+    return qweight
